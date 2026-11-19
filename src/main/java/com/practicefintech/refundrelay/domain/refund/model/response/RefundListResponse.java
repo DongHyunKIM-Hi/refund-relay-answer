@@ -6,7 +6,6 @@ import org.springframework.data.domain.Page;
 
 import java.util.List;
 
-/** 2단계에서 추가. 주문별 목록 조회(페이지 나누기) 응답. */
 @Getter
 @AllArgsConstructor
 public class RefundListResponse {

@@ -18,17 +18,8 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 
 /**
- * 환불 요청 1건.
- * 2단계에서 실패 사유(failureReason)와 다음 시도 시각(nextAttemptAt)을 추가했다.
- * 이 두 칸이 있어야 "실패했지만 아직 끝난 게 아니라 0.5초 뒤에 다시 보낼 건"을 표현할 수 있다.
- *
- * 2단계에서 여전히 하지 않는 것
- * - refundId에 유일 제약(unique)을 걸지 않는다.
- *   같은 환불 ID가 동시에 들어오면 두 요청 모두 "기존 건 없음"으로 판단해 2건이 저장된다. (S4 위반)
- *
- * 왜 다음 단계가 필요한가
- * - 3단계에서 unique = true를 걸어 DB가 마지막으로 막게 하고,
- *   접수 로직에서는 주문 단위 락으로 조회와 저장을 한 덩어리로 묶는다.
+ * 환불 요청 1건. refundId에 유일 제약을 걸어, 같은 ID의 동시 요청을 DB에서 막는
+ * 마지막 방어 수단으로 사용한다. (주된 방어 수단은 RefundService의 주문 단위 락)
  */
 @Entity
 @Getter
@@ -40,8 +31,7 @@ public class Refund {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 3단계에서 unique = true가 붙는 자리다.
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, unique = true, length = 50)
     private String refundId;
 
     @Column(nullable = false, length = 50)

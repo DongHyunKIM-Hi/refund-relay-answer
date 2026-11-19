@@ -20,22 +20,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 접수된 환불을 뒤에서 가상 결제대행사로 전달하는 워커.
- *
- * 2단계에서 추가한 것
- * - 재시도: 실패하면 0.5초, 1초, 2초 뒤에 다시 보낸다. 최초 시도를 포함해 최대 4번. (S9)
- * - 시간 초과: 5초 안에 응답이 없으면 PG_TIMEOUT으로 보고, 같은 refundId로 다시 보낸다. (S10, S12)
- * - 스레드 풀: 건마다 작업 하나를 맡겨, 느린 건 하나가 나머지 전부를 막지 않게 했다.
- *   refundsInFlight는 "지금 보내는 중인 건"을 기억해, 같은 건이 두 번 나가지 않게 한다.
- *
- * 2단계에서 여전히 하지 않는 것 (= 3단계 몫)
- * - 같은 주문의 순서 보장. 막는 단위가 "건"(id)이라, 같은 주문의 환불 두 건이 동시에
- *   결제대행사로 나간다. 앞 건이 아직 끝나지 않았는데 뒤 건이 먼저 끝날 수 있다. (S11 위반)
- *
- * 왜 다음 단계가 필요한가
- * - 3단계에서는 막는 단위를 "건"에서 "주문(orderId)"으로 바꾼다. 주문 하나를 작업 하나로 맡기고,
- *   그 안에서 항상 가장 오래된 미종결 건만 처리한다. 그러면 같은 주문은 한 건씩,
- *   다른 주문은 그대로 동시에 처리된다.
+ * 접수된 환불을 뒤에서 가상 결제대행사로 전달하는 워커. 두 가지를 동시에 만족해야 한다.
+ *   1) 같은 주문(orderId)의 환불은 접수 순서대로 한 건씩 처리한다. (시나리오 S11)
+ *   2) 서로 다른 주문끼리는 병렬로 처리해, 한 주문이 오래 걸려도 다른 주문이 막히지 않는다.
+ * 그래서 주문 하나를 스레드 풀의 작업 하나로 처리하고, ordersInFlight로 같은 주문이
+ * 동시에 두 번 처리되지 않게만 막는다. 주문 안에서는 항상 가장 오래된 건부터 처리하고,
+ * 그 건이 재시도 대기 중이면 같은 주문의 다음 건을 먼저 보내지 않고 이번 차례를
+ * 건너뛴다. (앞 건이 종결되기 전에는 다음 건을 보내지 않는다는 규칙, 시나리오 S11)
  */
 @Component
 @RequiredArgsConstructor
@@ -44,8 +35,7 @@ public class RefundWorker {
     private final RefundRepository repository;
     private final PgClient pgClient;
     private final WorkerProperties properties;
-    /** 지금 결제대행사로 보내는 중인 건(Refund.id). 같은 건이 중복으로 나가는 것만 막는다. */
-    private final Set<Long> refundsInFlight = ConcurrentHashMap.newKeySet();
+    private final Set<String> ordersInFlight = ConcurrentHashMap.newKeySet();
     private ExecutorService pool;
 
     @jakarta.annotation.PostConstruct
@@ -55,28 +45,32 @@ public class RefundWorker {
 
     @Scheduled(fixedDelayString = "${worker.tick-interval-ms}")
     public void tick() {
-        for (Refund due : repository.findDueRefunds(Instant.now())) {
-            Long id = due.getId();
-            // 같은 주문인지는 보지 않는다. 그래서 같은 주문의 두 건이 나란히 나간다. (3단계에서 수정)
-            if (refundsInFlight.add(id)) {
+        for (String orderId : repository.findOrderIdsWithDueRefunds(Instant.now())) {
+            if (ordersInFlight.add(orderId)) {
                 pool.submit(() -> {
                     try {
-                        processOneAttempt(id);
+                        processOneAttempt(orderId);
                     } finally {
-                        refundsInFlight.remove(id);
+                        ordersInFlight.remove(orderId);
                     }
                 });
             }
         }
     }
 
-    /** 환불 한 건에 대한 한 번의 처리 시도. */
-    void processOneAttempt(Long id) {
-        Optional<Refund> found = repository.findById(id);
-        if (found.isEmpty() || found.get().getStatus() != RefundStatus.ACCEPTED) {
+    /** 한 주문에 대해 한 번의 처리 시도. 테스트에서 직접 호출할 수 있도록 패키지 범위로 둔다. */
+    void processOneAttempt(String orderId) {
+        // 주문에서 가장 오래된 미종결 건을 고른다. 이 건이 재시도 대기 중이면
+        // 더 최근 건이 처리 가능하더라도 보내지 않는다. 접수 순서가 뒤집히기 때문이다.
+        Optional<Refund> oldest = repository.findFirstByOrderIdAndStatusOrderByRequestedAtAsc(
+                orderId, RefundStatus.ACCEPTED);
+        if (oldest.isEmpty()) {
             return;
         }
-        Refund refund = found.get();
+        Refund refund = oldest.get();
+        if (refund.getNextAttemptAt() != null && refund.getNextAttemptAt().isAfter(Instant.now())) {
+            return;
+        }
         refund.markSending();
         repository.save(refund);
 

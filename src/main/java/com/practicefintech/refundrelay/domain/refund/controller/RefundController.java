@@ -18,10 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * API 명세: 지원자 README 5장 (구현할 API 명세)
- * 2단계에서 @Valid(입력 검증)와 목록 조회를 추가했다.
- */
+/** API 명세: 지원자 README 5장 (구현할 API 명세) */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/refunds")

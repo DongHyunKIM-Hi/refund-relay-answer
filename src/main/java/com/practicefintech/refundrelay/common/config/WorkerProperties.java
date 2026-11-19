@@ -6,7 +6,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
 
-/** 2단계에서 추가. 재시도 횟수와 간격, 워커 스레드 풀 크기. */
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "worker")

@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 2단계에서 검증 애너테이션을 붙였다. 위반하면 컨트롤러의 @Valid가 걸러 400을 응답한다. */
 @Getter
 @NoArgsConstructor
 public class RefundRequest {

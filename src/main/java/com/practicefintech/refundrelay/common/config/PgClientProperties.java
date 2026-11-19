@@ -15,6 +15,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class PgClientProperties {
 
     private String baseUrl;
-    /** 2단계에서 추가. 이 시간을 넘기면 PG_TIMEOUT으로 보고 같은 refundId로 재시도한다. */
     private long callTimeoutMs;
 }

@@ -21,7 +21,7 @@ pg:
   base-url: http://localhost:9090
   call-timeout-ms: 5000
 
-# 처리 워커(재시도) 설정. 2단계에서 재시도와 스레드 풀 설정을 추가했다.
+# 처리 워커(재시도) 설정
 worker:
   pool-size: 8
   tick-interval-ms: 300
