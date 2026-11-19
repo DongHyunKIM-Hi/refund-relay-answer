@@ -1,29 +1,30 @@
 package com.practicefintech.refundrelay.domain.refund.model.request;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * 환불 접수 요청 본문.
- *
- * 1단계에서 일부러 하지 않는 것
- * - 입력 검증 애너테이션(@NotBlank, @Min, @Size)을 붙이지 않는다.
- *   금액이 0이어도, 필수값이 없어도 그대로 저장을 시도한다.
- *
- * 왜 다음 단계가 필요한가
- * - 2단계에서 검증 애너테이션과 @Valid를 붙여 400 INVALID_REQUEST를 응답한다.
- */
+/** 2단계에서 검증 애너테이션을 붙였다. 위반하면 컨트롤러의 @Valid가 걸러 400을 응답한다. */
 @Getter
 @NoArgsConstructor
 public class RefundRequest {
 
+    @NotBlank
+    @Size(max = 50)
     private String refundId;
 
+    @NotBlank
+    @Size(max = 50)
     private String orderId;
 
+    @Min(1)
     private long paidAmount;
 
+    @Min(1)
     private long refundAmount;
 
+    @Size(max = 200)
     private String reason;
 }

@@ -27,8 +27,7 @@ public class RefundDetailResponse {
                 refund.getOrderId(),
                 refund.getRefundAmount(),
                 refund.getStatus().name(),
-                // 1단계는 실패 사유를 구분하지 않아 항상 null이다. 2단계에서 채운다.
-                null,
+                refund.getFailureReason() == null ? null : refund.getFailureReason().name(),
                 refund.getAttemptCount(),
                 toLocal(refund.getRequestedAt()),
                 toLocal(refund.getCompletedAt())
